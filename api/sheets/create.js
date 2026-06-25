@@ -17,10 +17,8 @@ module.exports = async function(req, res) {
     const auth = getAuth();
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // Si el usuario configuró una hoja maestra, usamos esa
-    if (process.env.GOOGLE_SHEET_ID) {
-      return res.status(200).json({ ok: true, spreadsheetId: process.env.GOOGLE_SHEET_ID });
-    }
+    // Eliminamos la lógica de usar un solo ID maestro porque el usuario
+    // desea que se cree uno nuevo cada vez.
 
     const response = await sheets.spreadsheets.create({
       resource: {
@@ -31,6 +29,35 @@ module.exports = async function(req, res) {
     });
 
     const spreadsheetId = response.data.spreadsheetId;
+    const drive = google.drive({ version: 'v3', auth });
+
+    try {
+      if (process.env.GOOGLE_ADMIN_EMAIL) {
+        // Compartir explícitamente con el correo del usuario
+        await drive.permissions.create({
+          fileId: spreadsheetId,
+          sendNotificationEmail: false,
+          requestBody: {
+            role: 'writer',
+            type: 'user',
+            emailAddress: process.env.GOOGLE_ADMIN_EMAIL
+          }
+        });
+      } else {
+        // Intentar hacerlo público (suele fallar en organizaciones estrictas)
+        await drive.permissions.create({
+          fileId: spreadsheetId,
+          requestBody: {
+            role: 'writer',
+            type: 'anyone'
+          }
+        });
+      }
+    } catch (permError) {
+      console.error("Error al compartir el archivo, pero se creó exitosamente:", permError);
+      // No lanzamos error 500 para que la app no se rompa, 
+      // pero el usuario podría tener "Acceso Denegado" al abrir el link.
+    }
 
     res.status(200).json({ ok: true, spreadsheetId });
   } catch (error) {
