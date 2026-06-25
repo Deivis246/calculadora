@@ -1,0 +1,7 @@
+{
+  "name": "calculadora-static",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "mkdir -p public && cp -r assets index.html favicon.svg opengraph.jpg README.txt public/ || true"
+  }
+}
