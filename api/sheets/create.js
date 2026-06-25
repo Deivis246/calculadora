@@ -25,7 +25,20 @@ module.exports = async function(req, res) {
       }
     });
 
-    res.status(200).json({ ok: true, spreadsheetId: response.data.spreadsheetId });
+    const spreadsheetId = response.data.spreadsheetId;
+
+    // Compartir el archivo para que cualquiera con el enlace pueda verlo/editarlo
+    // de lo contrario, al abrir el link, dirá "Acceso Denegado"
+    const drive = google.drive({ version: 'v3', auth });
+    await drive.permissions.create({
+      fileId: spreadsheetId,
+      requestBody: {
+        role: 'writer',
+        type: 'anyone'
+      }
+    });
+
+    res.status(200).json({ ok: true, spreadsheetId });
   } catch (error) {
     console.error('Error in create sheet:', error);
     res.status(500).json({ error: error.message });
