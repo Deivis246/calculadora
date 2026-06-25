@@ -17,6 +17,11 @@ module.exports = async function(req, res) {
     const auth = getAuth();
     const sheets = google.sheets({ version: 'v4', auth });
 
+    // Si el usuario configuró una hoja maestra, usamos esa
+    if (process.env.GOOGLE_SHEET_ID) {
+      return res.status(200).json({ ok: true, spreadsheetId: process.env.GOOGLE_SHEET_ID });
+    }
+
     const response = await sheets.spreadsheets.create({
       resource: {
         properties: {
@@ -26,17 +31,6 @@ module.exports = async function(req, res) {
     });
 
     const spreadsheetId = response.data.spreadsheetId;
-
-    // Compartir el archivo para que cualquiera con el enlace pueda verlo/editarlo
-    // de lo contrario, al abrir el link, dirá "Acceso Denegado"
-    const drive = google.drive({ version: 'v3', auth });
-    await drive.permissions.create({
-      fileId: spreadsheetId,
-      requestBody: {
-        role: 'writer',
-        type: 'anyone'
-      }
-    });
 
     res.status(200).json({ ok: true, spreadsheetId });
   } catch (error) {
