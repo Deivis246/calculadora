@@ -27,9 +27,12 @@ module.exports = async function(req, res) {
       imcCalc = +(patient.peso / (tallaMetros * tallaMetros)).toFixed(1);
     }
 
+    const now = new Date();
+    const fechaHoraFormateada = now.toLocaleDateString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + now.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour12: false });
+
     // Mapeo estructurado exacto a las 28 columnas de Replit
     const rowData = [
-      new Date().toLocaleString('es-ES', { timeZone: 'America/Lima' }), // 1. Fecha/Hora
+      fechaHoraFormateada,                                              // 1. Fecha/Hora
       patient.nombre || "Anónimo",                                      // 2. Nombre
       patient.edad ?? "",                                               // 3. Edad
       patient.sexo ?? "",                                               // 4. Sexo
@@ -59,7 +62,7 @@ module.exports = async function(req, res) {
       patient.nombreAntihipertensivos ?? ""                             // 28. Antihipertensivos (nombre)
     ];
 
-    // 1. Insertar fila con INSERT_ROWS (100% garantizado)
+    // 1. Insertar fila con INSERT_ROWS
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: 'A1',
@@ -70,7 +73,7 @@ module.exports = async function(req, res) {
       },
     });
 
-    // 2. Eliminar inmediatamente el color azul oscuro heredado del encabezado
+    // 2. Limpiar fondo azul y dar formato de Fecha y Hora a la columna A
     try {
       const meta = await sheets.spreadsheets.get({ spreadsheetId });
       const firstTabId = meta.data.sheets[0].properties.sheetId;
@@ -78,22 +81,35 @@ module.exports = async function(req, res) {
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId,
         requestBody: {
-          requests: [{
-            repeatCell: {
-              range: { sheetId: firstTabId, startRowIndex: 1 }, // Desde la fila 2 hacia abajo
-              cell: {
-                userEnteredFormat: {
-                  backgroundColor: { red: 1, green: 1, blue: 1 }, // Fondo blanco
-                  textFormat: { foregroundColor: { red: 0, green: 0, blue: 0 }, bold: false } // Texto negro normal
-                }
-              },
-              fields: "userEnteredFormat(backgroundColor,textFormat)"
+          requests: [
+            {
+              repeatCell: {
+                range: { sheetId: firstTabId, startRowIndex: 1 }, // Quitar color de fondo a todo abajo del encabezado
+                cell: {
+                  userEnteredFormat: {
+                    backgroundColor: { red: 1, green: 1, blue: 1 },
+                    textFormat: { foregroundColor: { red: 0, green: 0, blue: 0 }, bold: false }
+                  }
+                },
+                fields: "userEnteredFormat(backgroundColor,textFormat)"
+              }
+            },
+            {
+              repeatCell: {
+                range: { sheetId: firstTabId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: 1 }, // Columna A como Fecha/Hora
+                cell: {
+                  userEnteredFormat: {
+                    numberFormat: { type: 'DATE_TIME', pattern: 'dd/MM/yyyy HH:mm:ss' }
+                  }
+                },
+                fields: "userEnteredFormat.numberFormat"
+              }
             }
-          }]
+          ]
         }
       });
     } catch (fmtErr) {
-      console.error("No se pudo quitar el color de fondo:", fmtErr);
+      console.error("No se pudo aplicar formato de celda:", fmtErr);
     }
 
     res.status(200).json({ ok: true });

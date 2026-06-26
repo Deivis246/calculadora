@@ -39,18 +39,31 @@ module.exports = async function(req, res) {
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId,
         requestBody: {
-          requests: [{
-            repeatCell: {
-              range: { sheetId: firstTabId, startRowIndex: 1 },
-              cell: {
-                userEnteredFormat: {
-                  backgroundColor: { red: 1, green: 1, blue: 1 },
-                  textFormat: { foregroundColor: { red: 0, green: 0, blue: 0 }, bold: false }
-                }
-              },
-              fields: "userEnteredFormat(backgroundColor,textFormat)"
+          requests: [
+            {
+              repeatCell: {
+                range: { sheetId: firstTabId, startRowIndex: 1 },
+                cell: {
+                  userEnteredFormat: {
+                    backgroundColor: { red: 1, green: 1, blue: 1 },
+                    textFormat: { foregroundColor: { red: 0, green: 0, blue: 0 }, bold: false }
+                  }
+                },
+                fields: "userEnteredFormat(backgroundColor,textFormat)"
+              }
+            },
+            {
+              repeatCell: {
+                range: { sheetId: firstTabId, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: 1 },
+                cell: {
+                  userEnteredFormat: {
+                    numberFormat: { type: 'DATE_TIME', pattern: 'dd/MM/yyyy HH:mm:ss' }
+                  }
+                },
+                fields: "userEnteredFormat.numberFormat"
+              }
             }
-          }]
+          ]
         }
       });
     } catch (fmtErr) {
