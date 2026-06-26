@@ -2,7 +2,6 @@ const { google } = require('googleapis');
 const { getAuth } = require('./_auth');
 
 module.exports = async function(req, res) {
-  // Allow CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'OPTIONS, POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -11,7 +10,9 @@ module.exports = async function(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
   try {
-    const { spreadsheetId, patient } = req.body;
+    const { patient } = req.body;
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID || req.body.spreadsheetId;
+
     if (!spreadsheetId || !patient) {
       return res.status(400).json({ error: 'Missing spreadsheetId or patient data' });
     }
@@ -19,12 +20,11 @@ module.exports = async function(req, res) {
     const auth = getAuth();
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // Extraer todos los valores de las propiedades del paciente de forma ordenada
     const rowData = Object.values(patient);
 
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: 'Sheet1!A1',
+      range: 'A1',
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       resource: {
@@ -35,7 +35,6 @@ module.exports = async function(req, res) {
     res.status(200).json({ ok: true });
   } catch (error) {
     console.error('Error in append sheet:', error);
-    // Devolvemos "not found" para obligar al JS compilado a limpiar el localStorage obsoleto
-    res.status(404).json({ error: 'Spreadsheet not found or permission denied. Resetting cache.' });
+    res.status(500).json({ error: error.message });
   }
 };
