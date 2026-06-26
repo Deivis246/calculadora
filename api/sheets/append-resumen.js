@@ -20,33 +20,31 @@ module.exports = async function(req, res) {
     const auth = getAuth();
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // 1. Verificar si existe la pestaña "resumen" o "Resumen"
-    const meta = await sheets.spreadsheets.get({ spreadsheetId });
-    let resumenTab = meta.data.sheets.find(s => s.properties.title.toLowerCase() === 'resumen');
-
-    let tabId;
-    let isNewTab = false;
-
-    if (!resumenTab) {
-      // Crear la pestaña "resumen" automáticamente
-      const addResp = await sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
-        requestBody: {
-          requests: [{
-            addSheet: {
-              properties: { title: 'resumen' }
-            }
-          }]
-        }
-      });
-      tabId = addResp.data.replies[0].addSheet.properties.sheetId;
-      isNewTab = true;
-    } else {
-      tabId = resumenTab.properties.sheetId;
+    // 1. Obtener pestañas del documento
+    let meta;
+    try {
+      meta = await sheets.spreadsheets.get({ spreadsheetId });
+    } catch (errGet) {
+      return res.status(500).json({ error: 'No se pudo acceder al Google Sheet: ' + errGet.message });
     }
 
-    // 2. Si la pestaña es nueva, insertamos los encabezados clínicos
-    if (isNewTab) {
+    const resumenTab = meta.data.sheets.find(s => s.properties.title.toLowerCase() === 'resumen');
+    if (!resumenTab) {
+      return res.status(400).json({ error: 'No existe la pestaña "resumen". Por favor presiona el botón + abajo en tu Excel y llámala "resumen".' });
+    }
+
+    const tabId = resumenTab.properties.sheetId;
+    const tabTitle = resumenTab.properties.title; // Respeta mayúsculas si el usuario puso "Resumen"
+
+    // 2. Verificar si la pestaña está vacía leyendo la celda A1
+    const checkEmpty = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${tabTitle}!A1:B1`
+    });
+
+    const isEmpty = !checkEmpty.data.values || checkEmpty.data.values.length === 0;
+
+    if (isEmpty) {
       const headers = [
         "Fecha/Hora", "Nombre", "Edad", "Sexo", "IMC (kg/m²)", "Cat. IMC",
         "TFGe (mL/min)", "Estado Renal", "FINDRISC (pts)", "Riesgo FINDRISC",
@@ -58,48 +56,50 @@ module.exports = async function(req, res) {
 
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: 'resumen!A1',
+        range: `${tabTitle}!A1`,
         valueInputOption: 'USER_ENTERED',
         insertDataOption: 'INSERT_ROWS',
         resource: { values: [headers] }
       });
 
-      // Dar formato azul oscuro con letras blancas en negrita al encabezado
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
-        requestBody: {
-          requests: [{
-            repeatCell: {
-              range: { sheetId: tabId, startRowIndex: 0, endRowIndex: 1 },
-              cell: {
-                userEnteredFormat: {
-                  backgroundColor: { red: 0.08, green: 0.15, blue: 0.36 },
-                  textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true }
-                }
-              },
-              fields: "userEnteredFormat(backgroundColor,textFormat)"
-            }
-          }]
-        }
-      });
+      // Dar formato azul marino elegante con letras blancas en negrita al encabezado
+      try {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            requests: [{
+              repeatCell: {
+                range: { sheetId: tabId, startRowIndex: 0, endRowIndex: 1 },
+                cell: {
+                  userEnteredFormat: {
+                    backgroundColor: { red: 0.08, green: 0.15, blue: 0.36 },
+                    textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true }
+                  }
+                },
+                fields: "userEnteredFormat(backgroundColor,textFormat)"
+              }
+            }]
+          }
+        });
+      } catch (e) {}
     }
 
-    // 3. Preparar la fila del paciente con fecha y hora
+    // 3. Preparar la fila de datos del resumen ejecutivo
     const now = new Date();
     const fechaHoraFormateada = now.toLocaleDateString('es-PE', { timeZone: 'America/Lima', day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + now.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour12: false });
 
     const rowData = [fechaHoraFormateada, ...Object.values(resumen)];
 
-    // 4. Insertar datos en la pestaña "resumen"
+    // 4. Insertar fila en la pestaña resumen
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: 'resumen!A1',
+      range: `${tabTitle}!A1`,
       valueInputOption: 'USER_ENTERED',
       insertDataOption: 'INSERT_ROWS',
       resource: { values: [rowData] }
     });
 
-    // 5. Limpiar fondo y dar formato de fecha a columna A en la pestaña resumen
+    // 5. Limpiar fondo y dar formato de Fecha/Hora a la columna A
     try {
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId,
@@ -131,9 +131,7 @@ module.exports = async function(req, res) {
           ]
         }
       });
-    } catch (fmtErr) {
-      console.error("Error aplicando formato en resumen:", fmtErr);
-    }
+    } catch (e) {}
 
     res.status(200).json({ ok: true });
   } catch (error) {
