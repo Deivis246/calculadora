@@ -34,6 +34,6 @@ module.exports = async function(req, res) {
     res.status(200).json({ ok: true });
   } catch (error) {
     console.error('Error in append-resumen sheet:', error);
-    res.status(500).json({ error: error.message });
+    res.status(404).json({ error: 'Spreadsheet not found or permission denied. Resetting cache.' });
   }
 };

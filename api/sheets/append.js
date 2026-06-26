@@ -35,6 +35,7 @@ module.exports = async function(req, res) {
     res.status(200).json({ ok: true });
   } catch (error) {
     console.error('Error in append sheet:', error);
-    res.status(500).json({ error: error.message });
+    // Devolvemos "not found" para obligar al JS compilado a limpiar el localStorage obsoleto
+    res.status(404).json({ error: 'Spreadsheet not found or permission denied. Resetting cache.' });
   }
 };
