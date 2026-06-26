@@ -26,7 +26,7 @@ module.exports = async function(req, res) {
       spreadsheetId,
       range: 'A1',
       valueInputOption: 'USER_ENTERED',
-      insertDataOption: 'OVERWRITE',
+      insertDataOption: 'INSERT_ROWS',
       resource: {
         values: [rowData],
       },
