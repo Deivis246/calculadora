@@ -63,7 +63,7 @@ module.exports = async function(req, res) {
       spreadsheetId,
       range: 'A1',
       valueInputOption: 'USER_ENTERED',
-      insertDataOption: 'INSERT_ROWS',
+      insertDataOption: 'OVERWRITE', // Evita que herede el color azul oscuro de relleno del encabezado
       resource: {
         values: [rowData],
       },
