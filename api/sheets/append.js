@@ -59,6 +59,7 @@ module.exports = async function(req, res) {
       patient.nombreAntihipertensivos ?? ""                             // 28. Antihipertensivos (nombre)
     ];
 
+    // 1. Insertar fila con INSERT_ROWS (100% garantizado)
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range: 'A1',
@@ -68,6 +69,32 @@ module.exports = async function(req, res) {
         values: [rowData],
       },
     });
+
+    // 2. Eliminar inmediatamente el color azul oscuro heredado del encabezado
+    try {
+      const meta = await sheets.spreadsheets.get({ spreadsheetId });
+      const firstTabId = meta.data.sheets[0].properties.sheetId;
+
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [{
+            repeatCell: {
+              range: { sheetId: firstTabId, startRowIndex: 1 }, // Desde la fila 2 hacia abajo
+              cell: {
+                userEnteredFormat: {
+                  backgroundColor: { red: 1, green: 1, blue: 1 }, // Fondo blanco
+                  textFormat: { foregroundColor: { red: 0, green: 0, blue: 0 }, bold: false } // Texto negro normal
+                }
+              },
+              fields: "userEnteredFormat(backgroundColor,textFormat)"
+            }
+          }]
+        }
+      });
+    } catch (fmtErr) {
+      console.error("No se pudo quitar el color de fondo:", fmtErr);
+    }
 
     res.status(200).json({ ok: true });
   } catch (error) {

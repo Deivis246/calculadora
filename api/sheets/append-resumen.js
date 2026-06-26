@@ -32,6 +32,31 @@ module.exports = async function(req, res) {
       },
     });
 
+    try {
+      const meta = await sheets.spreadsheets.get({ spreadsheetId });
+      const firstTabId = meta.data.sheets[0].properties.sheetId;
+
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [{
+            repeatCell: {
+              range: { sheetId: firstTabId, startRowIndex: 1 },
+              cell: {
+                userEnteredFormat: {
+                  backgroundColor: { red: 1, green: 1, blue: 1 },
+                  textFormat: { foregroundColor: { red: 0, green: 0, blue: 0 }, bold: false }
+                }
+              },
+              fields: "userEnteredFormat(backgroundColor,textFormat)"
+            }
+          }]
+        }
+      });
+    } catch (fmtErr) {
+      console.error("No se pudo limpiar el formato:", fmtErr);
+    }
+
     res.status(200).json({ ok: true });
   } catch (error) {
     console.error('Error in append-resumen sheet:', error);
