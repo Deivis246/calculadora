@@ -31,20 +31,24 @@ module.exports = async function(req, res) {
     const spreadsheetId = response.data.spreadsheetId;
     const drive = google.drive({ version: 'v3', auth });
 
+    // Correo de destino configurable mediante variable de entorno, por defecto deiviscuentas50@gmail.com
+    const targetEmail = process.env.GOOGLE_ADMIN_EMAIL || process.env.DESTINATION_EMAIL || 'deiviscuentas50@gmail.com';
+
     try {
-      if (process.env.GOOGLE_ADMIN_EMAIL) {
-        // Compartir explícitamente con el correo del usuario
-        await drive.permissions.create({
-          fileId: spreadsheetId,
-          sendNotificationEmail: false,
-          requestBody: {
-            role: 'writer',
-            type: 'user',
-            emailAddress: process.env.GOOGLE_ADMIN_EMAIL
-          }
-        });
-      } else {
-        // Intentar hacerlo público (suele fallar en organizaciones estrictas)
+      // Compartir con el correo y ENVIAR NOTIFICACIÓN POR CORREO con el documento
+      await drive.permissions.create({
+        fileId: spreadsheetId,
+        sendNotificationEmail: true,
+        requestBody: {
+          role: 'writer',
+          type: 'user',
+          emailAddress: targetEmail
+        }
+      });
+      console.log(`Documento creado y compartido exitosamente por correo a: ${targetEmail}`);
+    } catch (permError) {
+      console.error("Error al enviar por correo el documento, intentando acceso público:", permError);
+      try {
         await drive.permissions.create({
           fileId: spreadsheetId,
           requestBody: {
@@ -52,11 +56,9 @@ module.exports = async function(req, res) {
             type: 'anyone'
           }
         });
+      } catch (publicErr) {
+        console.error("También falló el permiso público:", publicErr);
       }
-    } catch (permError) {
-      console.error("Error al compartir el archivo, pero se creó exitosamente:", permError);
-      // No lanzamos error 500 para que la app no se rompa, 
-      // pero el usuario podría tener "Acceso Denegado" al abrir el link.
     }
 
     res.status(200).json({ ok: true, spreadsheetId });
